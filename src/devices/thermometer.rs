@@ -20,12 +20,12 @@ impl Thermometer {
     /// ```
     /// use smart_home::Thermometer;
     ///
-    /// let thermometer = Thermometer::new("Living room".to_string(), 22.5);
+    /// let thermometer = Thermometer::new("Living room", 22.5);
     /// assert_eq!(thermometer.temperature(), 22.5);
     /// ```
-    pub fn new(name: String, current_temperature: f32) -> Self {
+    pub fn new(name: impl Into<String>, current_temperature: f32) -> Self {
         Self {
-            name,
+            name: name.into(),
             current_temperature,
         }
     }

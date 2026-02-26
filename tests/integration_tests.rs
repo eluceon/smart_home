@@ -20,7 +20,14 @@ fn smart_home_report_and_toggle_socket() {
     let mut home = SmartHome::new("Home".to_string(), rooms);
 
     // Initial report
-    home.print_full_report();
+    let mut buf = Vec::new();
+    home.write_full_report(&mut buf).unwrap();
+    let report = String::from_utf8(buf).unwrap();
+    assert!(report.contains("Home"));
+    assert!(report.contains("Living room"));
+    assert!(report.contains("Bedroom"));
+    assert!(report.contains("Sensor"));
+    assert!(report.contains("Lamp"));
 
     // Turn the bedroom socket on and off
     let socket = home
@@ -36,6 +43,10 @@ fn smart_home_report_and_toggle_socket() {
     assert!(!socket.is_on());
     assert_eq!(socket.power(), 0.0);
 
-    // Final report
-    home.print_full_report();
+    // Final report reflects the toggled state
+    let mut buf = Vec::new();
+    home.write_full_report(&mut buf).unwrap();
+    let report = String::from_utf8(buf).unwrap();
+    assert!(report.contains("Space heater"));
+    assert!(report.contains("off"));
 }

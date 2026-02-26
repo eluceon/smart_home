@@ -24,11 +24,14 @@ impl SmartHome {
     /// use smart_home::{SmartHome, Room};
     ///
     /// let rooms = vec![];
-    /// let house = SmartHome::new("My home".to_string(), rooms);
+    /// let house = SmartHome::new("My home", rooms);
     /// assert_eq!(house.name(), "My home");
     /// ```
-    pub fn new(name: String, rooms: Vec<Room>) -> Self {
-        Self { name, rooms }
+    pub fn new(name: impl Into<String>, rooms: Vec<Room>) -> Self {
+        Self {
+            name: name.into(),
+            rooms,
+        }
     }
 
     /// Returns the home name.
@@ -60,6 +63,10 @@ impl SmartHome {
     }
 
     /// Writes a full report of the home and all rooms.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to `writer` fails.
     pub fn write_full_report<W: Write>(&self, mut writer: W) -> io::Result<()> {
         let separator = "=".repeat(50);
         writeln!(writer, "\n{}", separator)?;
@@ -77,7 +84,9 @@ impl SmartHome {
 
     /// Prints a full report of the home and all rooms to stdout.
     pub fn print_full_report(&self) {
-        let _ = self.write_full_report(io::stdout());
+        if let Err(e) = self.write_full_report(io::stdout()) {
+            eprintln!("Failed to write home report: {e}");
+        }
     }
 }
 
@@ -125,8 +134,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_smart_home_get_room_out_of_bounds() {
-        let rooms = vec![];
-        let house = SmartHome::new("Home".to_string(), rooms);
+        let house = SmartHome::new("Home", vec![]);
         let _ = house.get_room(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_smart_home_get_room_mut_out_of_bounds() {
+        let mut house = SmartHome::new("Home", vec![]);
+        let _ = house.get_room_mut(0);
     }
 }

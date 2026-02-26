@@ -19,7 +19,7 @@ impl SmartDevice {
     pub fn as_socket_mut(&mut self) -> Option<&mut Socket> {
         match self {
             SmartDevice::Socket(socket) => Some(socket),
-            _ => None,
+            SmartDevice::Thermometer(_) => None,
         }
     }
 
@@ -27,7 +27,7 @@ impl SmartDevice {
     pub fn as_socket(&self) -> Option<&Socket> {
         match self {
             SmartDevice::Socket(socket) => Some(socket),
-            _ => None,
+            SmartDevice::Thermometer(_) => None,
         }
     }
 
@@ -35,7 +35,7 @@ impl SmartDevice {
     pub fn as_thermometer(&self) -> Option<&Thermometer> {
         match self {
             SmartDevice::Thermometer(therm) => Some(therm),
-            _ => None,
+            SmartDevice::Socket(_) => None,
         }
     }
 
@@ -43,7 +43,7 @@ impl SmartDevice {
     pub fn as_thermometer_mut(&mut self) -> Option<&mut Thermometer> {
         match self {
             SmartDevice::Thermometer(therm) => Some(therm),
-            _ => None,
+            SmartDevice::Socket(_) => None,
         }
     }
 }

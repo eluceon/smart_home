@@ -21,12 +21,12 @@ impl Socket {
     /// ```
     /// use smart_home::Socket;
     ///
-    /// let socket = Socket::new("Desk lamp".to_string(), 60.0);
+    /// let socket = Socket::new("Desk lamp", 60.0);
     /// assert!(!socket.is_on());
     /// ```
-    pub fn new(name: String, power_consumption: f32) -> Self {
+    pub fn new(name: impl Into<String>, power_consumption: f32) -> Self {
         Self {
-            name,
+            name: name.into(),
             is_on: false,
             power_consumption,
         }

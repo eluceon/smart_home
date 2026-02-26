@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo build:*)",
+      "Bash(rustc:*)",
+      "Bash(cargo --version:*)",
+      "Bash(rustup show:*)",
+      "Bash(rustup toolchain list:*)",
+      "Bash(rustup run nightly cargo build:*)",
+      "Bash(rustup run nightly rustc:*)",
+      "Bash(rustup run nightly cargo:*)",
+      "Bash(RUSTUP_TOOLCHAIN=nightly cargo +nightly build:*)",
+      "Read(//tmp/sh_out/**)",
+      "Read(//tmp/sh_stable/**)",
+      "Bash(/home/dima/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc:*)",
+      "Bash(RUSTC=/home/dima/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc /home/dima/.cargo/bin/cargo test --manifest-path /home/dima/IT/study/rust/projects/otus_rust_developer_professional/smart_home/Cargo.toml)",
+      "Bash(RUSTC=/home/dima/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc /home/dima/.cargo/bin/cargo fmt --check --manifest-path /home/dima/IT/study/rust/projects/otus_rust_developer_professional/smart_home/Cargo.toml)",
+      "Bash(ls:*)",
+      "Read(//home/dima/.cargo/bin/**)",
+      "Bash(RUSTUP_TOOLCHAIN=stable cargo build:*)",
+      "Read(//home/dima/**)",
+      "Bash(rustup run stable cargo build:*)",
+      "Bash(PATH=$HOME/.cargo/bin:$PATH cargo build:*)",
+      "Bash(PATH=$HOME/.cargo/bin:$PATH $HOME/.cargo/bin/cargo build:*)",
+      "Bash(HOME=/home/dima)",
+      "Bash(echo:*)",
+      "Bash(export PATH=\"/home/dima/.cargo/bin:$PATH\")",
+      "Bash(/home/dima/.cargo/bin/cargo build:*)",
+      "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo build:*)",
+      "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo test:*)",
+      "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo clippy:*)",
+      "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo fmt:*)"
+    ],
+    "additionalDirectories": [
+      "/home/dima/.claude/agent-memory/rust-code-reviewer",
+      "/home/dima"
+    ]
+  }
+}
