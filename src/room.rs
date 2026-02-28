@@ -1,38 +1,22 @@
 //! Smart home room.
 
+use crate::report::Report;
 use crate::smart_device::SmartDevice;
-use std::io::{self, Write};
+use std::collections::HashMap;
 
-/// Represents a room with a list of smart devices.
+/// A room that holds a named collection of smart devices.
 #[derive(Debug, Clone)]
 pub struct Room {
     name: String,
-    devices: Vec<SmartDevice>,
+    devices: HashMap<String, SmartDevice>,
 }
 
 impl Room {
-    /// Creates a new room with the given devices.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Room name
-    /// * `devices` - Devices in the room
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use smart_home::{Room, SmartDevice, Thermometer};
-    ///
-    /// let devices = vec![
-    ///     SmartDevice::Thermometer(Thermometer::new("Sensor", 20.0))
-    /// ];
-    /// let room = Room::new("Bedroom", devices);
-    /// assert_eq!(room.name(), "Bedroom");
-    /// ```
-    pub fn new(name: impl Into<String>, devices: Vec<SmartDevice>) -> Self {
+    /// Creates a new empty room.
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            devices,
+            devices: HashMap::new(),
         }
     }
 
@@ -46,45 +30,45 @@ impl Room {
         self.devices.len()
     }
 
-    /// Returns a reference to a device by index.
+    /// Adds a device to the room under the given key.
     ///
-    /// # Panics
-    ///
-    /// Panics if the index is out of bounds.
-    pub fn get_device(&self, index: usize) -> &SmartDevice {
-        &self.devices[index]
+    /// Accepts any type that converts into [`SmartDevice`] (e.g. [`Socket`][crate::Socket]
+    /// or [`Thermometer`][crate::Thermometer]).
+    pub fn add_device(&mut self, name: impl Into<String>, device: impl Into<SmartDevice>) {
+        self.devices.insert(name.into(), device.into());
     }
 
-    /// Returns a mutable reference to a device by index.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the index is out of bounds.
-    pub fn get_device_mut(&mut self, index: usize) -> &mut SmartDevice {
-        &mut self.devices[index]
+    /// Removes and returns the device with the given key, or `None` if absent.
+    pub fn remove_device(&mut self, name: &str) -> Option<SmartDevice> {
+        self.devices.remove(name)
     }
 
-    /// Writes a report for all devices in the room.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if writing to `writer` fails.
-    pub fn write_report<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        writeln!(writer, "\nRoom: {}", self.name)?;
-        writeln!(writer, "  Devices: {}", self.devices.len())?;
-        for device in &self.devices {
-            writeln!(writer, "  {}", device)?;
-        }
-        Ok(())
+    /// Returns a shared reference to the device with the given key, or `None`.
+    pub fn get_device(&self, name: &str) -> Option<&SmartDevice> {
+        self.devices.get(name)
     }
 
-    /// Prints a report for all devices in the room to stdout.
-    pub fn print_report(&self) {
-        if let Err(e) = self.write_report(io::stdout()) {
-            eprintln!("Failed to write room report: {e}");
-        }
+    /// Returns a mutable reference to the device with the given key, or `None`.
+    pub fn get_device_mut(&mut self, name: &str) -> Option<&mut SmartDevice> {
+        self.devices.get_mut(name)
     }
 }
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+impl Report for Room {
+    fn report(&self) -> String {
+        let mut s = format!("Room '{}' ({} device(s)):\n", self.name, self.devices.len());
+        let mut keys: Vec<&String> = self.devices.keys().collect();
+        keys.sort();
+        for key in keys {
+            s.push_str(&format!("  [{}] {}\n", key, self.devices[key].report()));
+        }
+        s
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -93,51 +77,68 @@ mod tests {
 
     #[test]
     fn test_room_creation() {
-        let devices = vec![
-            SmartDevice::Thermometer(Thermometer::new("Sensor".to_string(), 20.0)),
-            SmartDevice::Socket(Socket::new("Lamp".to_string(), 100.0)),
-        ];
-        let room = Room::new("Living room".to_string(), devices);
-
+        let room = Room::new("Living room");
         assert_eq!(room.name(), "Living room");
+        assert_eq!(room.device_count(), 0);
+    }
+
+    #[test]
+    fn test_add_and_count() {
+        let mut room = Room::new("Bedroom");
+        room.add_device("sensor", Thermometer::new("Sensor", 20.0));
+        room.add_device("lamp", Socket::new("Lamp", 100.0));
         assert_eq!(room.device_count(), 2);
     }
 
     #[test]
-    fn test_room_get_device() {
-        let devices = vec![SmartDevice::Thermometer(Thermometer::new(
-            "Sensor".to_string(),
-            20.0,
-        ))];
-        let room = Room::new("Bedroom".to_string(), devices);
+    fn test_get_device() {
+        let mut room = Room::new("Bedroom");
+        room.add_device("sensor", Thermometer::new("Sensor", 20.0));
 
-        let device = room.get_device(0);
-        assert!(device.as_thermometer().is_some());
+        assert!(room
+            .get_device("sensor")
+            .unwrap()
+            .as_thermometer()
+            .is_some());
+        assert!(room.get_device("nonexistent").is_none());
     }
 
     #[test]
-    fn test_room_get_device_mut() {
-        let devices = vec![SmartDevice::Socket(Socket::new("Lamp".to_string(), 100.0))];
-        let mut room = Room::new("Kitchen".to_string(), devices);
+    fn test_get_device_mut() {
+        let mut room = Room::new("Kitchen");
+        room.add_device("lamp", Socket::new("Lamp", 100.0));
 
-        if let Some(socket) = room.get_device_mut(0).as_socket_mut() {
-            socket.turn_on();
-        }
+        room.get_device_mut("lamp")
+            .and_then(|d| d.as_socket_mut())
+            .unwrap()
+            .turn_on();
 
-        assert!(room.get_device(0).as_socket().unwrap().is_on());
+        assert!(room
+            .get_device("lamp")
+            .unwrap()
+            .as_socket()
+            .unwrap()
+            .is_on());
     }
 
     #[test]
-    #[should_panic]
-    fn test_room_get_device_out_of_bounds() {
-        let room = Room::new("Bathroom", vec![]);
-        let _ = room.get_device(0);
+    fn test_remove_device() {
+        let mut room = Room::new("Bathroom");
+        room.add_device("light", Socket::new("Light", 60.0));
+        assert_eq!(room.device_count(), 1);
+
+        assert!(room.remove_device("light").is_some());
+        assert_eq!(room.device_count(), 0);
+        assert!(room.remove_device("light").is_none());
     }
 
     #[test]
-    #[should_panic]
-    fn test_room_get_device_mut_out_of_bounds() {
-        let mut room = Room::new("Bathroom", vec![]);
-        let _ = room.get_device_mut(0);
+    fn test_report_contains_name_and_key() {
+        let mut room = Room::new("Hall");
+        room.add_device("sensor", Thermometer::new("Sensor", 22.5));
+        let r = room.report();
+        assert!(r.contains("Hall"));
+        assert!(r.contains("sensor"));
+        assert!(r.contains("22.5"));
     }
 }

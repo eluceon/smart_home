@@ -29,7 +29,19 @@
       "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo build:*)",
       "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo test:*)",
       "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo clippy:*)",
-      "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo fmt:*)"
+      "Bash(env PATH=\"/home/dima/.cargo/bin:/usr/bin:/bin\" /home/dima/.cargo/bin/cargo fmt:*)",
+      "Bash(/home/dima/IT/study/rust/projects/otus_rust_developer_professional/smart_home/tests/integration_tests.rs:*)",
+      "Bash(~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --version)",
+      "Bash(~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build:*)",
+      "Bash(RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build)",
+      "Bash(rustup which:*)",
+      "Bash(/home/dima/IT/study/rust/projects/otus_rust_developer_professional/smart_home/.cargo/config.toml:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(/home/dima/IT/study/rust/projects/otus_rust_developer_professional/smart_home/docs/implementation.md:*)",
+      "Bash(__NEW_LINE_1d96129054961b51__ cat)",
+      "Bash(/home/dima/IT/study/rust/projects/otus_rust_developer_professional/smart_home/docs/progress/current-task.md:*)"
     ],
     "additionalDirectories": [
       "/home/dima/.claude/agent-memory/rust-code-reviewer",

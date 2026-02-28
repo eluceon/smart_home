@@ -1,36 +1,24 @@
-//! Smart home.
+//! Smart home — top-level container for rooms.
 
+use crate::error::SmartHomeError;
+use crate::report::Report;
 use crate::room::Room;
-use std::io::{self, Write};
+use crate::smart_device::SmartDevice;
+use std::collections::HashMap;
 
-/// Represents a smart home with a list of rooms.
+/// A smart home that holds a named collection of rooms.
 #[derive(Debug, Clone)]
 pub struct SmartHome {
     name: String,
-    rooms: Vec<Room>,
+    rooms: HashMap<String, Room>,
 }
 
 impl SmartHome {
-    /// Creates a new smart home with the given rooms.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Home name
-    /// * `rooms` - Rooms in the home
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use smart_home::{SmartHome, Room};
-    ///
-    /// let rooms = vec![];
-    /// let house = SmartHome::new("My home", rooms);
-    /// assert_eq!(house.name(), "My home");
-    /// ```
-    pub fn new(name: impl Into<String>, rooms: Vec<Room>) -> Self {
+    /// Creates a new empty smart home.
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            rooms,
+            rooms: HashMap::new(),
         }
     }
 
@@ -44,104 +32,168 @@ impl SmartHome {
         self.rooms.len()
     }
 
-    /// Returns a reference to a room by index.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the index is out of bounds.
-    pub fn get_room(&self, index: usize) -> &Room {
-        &self.rooms[index]
+    /// Adds a room under the given key.
+    pub fn add_room(&mut self, name: impl Into<String>, room: Room) {
+        self.rooms.insert(name.into(), room);
     }
 
-    /// Returns a mutable reference to a room by index.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the index is out of bounds.
-    pub fn get_room_mut(&mut self, index: usize) -> &mut Room {
-        &mut self.rooms[index]
+    /// Removes and returns the room with the given key, or `None` if absent.
+    pub fn remove_room(&mut self, name: &str) -> Option<Room> {
+        self.rooms.remove(name)
     }
 
-    /// Writes a full report of the home and all rooms.
+    /// Returns a shared reference to the room with the given key, or `None`.
+    pub fn get_room(&self, name: &str) -> Option<&Room> {
+        self.rooms.get(name)
+    }
+
+    /// Returns a mutable reference to the room with the given key, or `None`.
+    pub fn get_room_mut(&mut self, name: &str) -> Option<&mut Room> {
+        self.rooms.get_mut(name)
+    }
+
+    /// Returns a shared reference to a device identified by room and device keys.
     ///
     /// # Errors
     ///
-    /// Returns an error if writing to `writer` fails.
-    pub fn write_full_report<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        let separator = "=".repeat(50);
-        writeln!(writer, "\n{}", separator)?;
-        writeln!(writer, "Smart home: {}", self.name)?;
-        writeln!(writer, "Rooms: {}", self.rooms.len())?;
-        writeln!(writer, "{}", separator)?;
-
-        for room in &self.rooms {
-            room.write_report(&mut writer)?;
-        }
-
-        writeln!(writer, "\n{}", separator)?;
-        Ok(())
-    }
-
-    /// Prints a full report of the home and all rooms to stdout.
-    pub fn print_full_report(&self) {
-        if let Err(e) = self.write_full_report(io::stdout()) {
-            eprintln!("Failed to write home report: {e}");
-        }
+    /// - [`SmartHomeError::RoomNotFound`] if `room_name` does not exist.
+    /// - [`SmartHomeError::DeviceNotFound`] if `device_name` does not exist in the room.
+    pub fn get_device(
+        &self,
+        room_name: &str,
+        device_name: &str,
+    ) -> Result<&SmartDevice, SmartHomeError> {
+        let room = self
+            .rooms
+            .get(room_name)
+            .ok_or_else(|| SmartHomeError::RoomNotFound(room_name.to_string()))?;
+        room.get_device(device_name)
+            .ok_or_else(|| SmartHomeError::DeviceNotFound(device_name.to_string()))
     }
 }
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+impl Report for SmartHome {
+    fn report(&self) -> String {
+        let sep = "=".repeat(50);
+        let mut s = format!(
+            "\n{}\nSmart Home '{}' ({} room(s)):\n{}\n",
+            sep,
+            self.name,
+            self.rooms.len(),
+            sep
+        );
+        let mut keys: Vec<&String> = self.rooms.keys().collect();
+        keys.sort();
+        for key in keys {
+            s.push_str(&format!("\n[Room: {}]\n", key));
+            s.push_str(&self.rooms[key].report());
+        }
+        s.push_str(&format!("\n{}\n", sep));
+        s
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::devices::{Socket, Thermometer};
-    use crate::smart_device::SmartDevice;
 
-    #[test]
-    fn test_smart_home_creation() {
-        let rooms = vec![];
-        let house = SmartHome::new("Apartment".to_string(), rooms);
+    fn make_home() -> SmartHome {
+        let mut home = SmartHome::new("Apartment");
 
-        assert_eq!(house.name(), "Apartment");
-        assert_eq!(house.room_count(), 0);
+        let mut living_room = Room::new("Living room");
+        living_room.add_device("sensor", Thermometer::new("Sensor", 20.0));
+        living_room.add_device("lamp", Socket::new("Lamp", 60.0));
+
+        let mut bedroom = Room::new("Bedroom");
+        bedroom.add_device("sensor", Thermometer::new("Sensor", 18.0));
+        bedroom.add_device("heater", Socket::new("Space heater", 2000.0));
+
+        home.add_room("living_room", living_room);
+        home.add_room("bedroom", bedroom);
+        home
     }
 
     #[test]
-    fn test_smart_home_get_room() {
-        let devices = vec![SmartDevice::Thermometer(Thermometer::new(
-            "Sensor".to_string(),
-            20.0,
-        ))];
-        let rooms = vec![Room::new("Bedroom".to_string(), devices)];
-        let house = SmartHome::new("Home".to_string(), rooms);
-
-        assert_eq!(house.get_room(0).name(), "Bedroom");
+    fn test_creation() {
+        let home = SmartHome::new("Apartment");
+        assert_eq!(home.name(), "Apartment");
+        assert_eq!(home.room_count(), 0);
     }
 
     #[test]
-    fn test_smart_home_get_room_mut() {
-        let devices = vec![SmartDevice::Socket(Socket::new("Lamp".to_string(), 100.0))];
-        let rooms = vec![Room::new("Kitchen".to_string(), devices)];
-        let mut house = SmartHome::new("Home".to_string(), rooms);
+    fn test_add_remove_room() {
+        let mut home = SmartHome::new("Home");
+        home.add_room("kitchen", Room::new("Kitchen"));
+        assert_eq!(home.room_count(), 1);
 
-        let room = house.get_room_mut(0);
-        if let Some(socket) = room.get_device_mut(0).as_socket_mut() {
-            socket.turn_on();
-        }
-
-        assert!(house.get_room(0).get_device(0).as_socket().unwrap().is_on());
+        assert!(home.remove_room("kitchen").is_some());
+        assert_eq!(home.room_count(), 0);
+        assert!(home.remove_room("kitchen").is_none());
     }
 
     #[test]
-    #[should_panic]
-    fn test_smart_home_get_room_out_of_bounds() {
-        let house = SmartHome::new("Home", vec![]);
-        let _ = house.get_room(0);
+    fn test_get_room() {
+        let home = make_home();
+        assert!(home.get_room("living_room").is_some());
+        assert!(home.get_room("nonexistent").is_none());
     }
 
     #[test]
-    #[should_panic]
-    fn test_smart_home_get_room_mut_out_of_bounds() {
-        let mut house = SmartHome::new("Home", vec![]);
-        let _ = house.get_room_mut(0);
+    fn test_get_room_mut_and_toggle_socket() {
+        let mut home = make_home();
+        home.get_room_mut("bedroom")
+            .unwrap()
+            .get_device_mut("heater")
+            .unwrap()
+            .as_socket_mut()
+            .unwrap()
+            .turn_on();
+
+        assert!(home
+            .get_room("bedroom")
+            .unwrap()
+            .get_device("heater")
+            .unwrap()
+            .as_socket()
+            .unwrap()
+            .is_on());
+    }
+
+    #[test]
+    fn test_get_device_ok() {
+        let home = make_home();
+        assert!(home.get_device("living_room", "lamp").is_ok());
+    }
+
+    #[test]
+    fn test_get_device_room_not_found() {
+        let home = make_home();
+        assert!(matches!(
+            home.get_device("no_such_room", "lamp"),
+            Err(SmartHomeError::RoomNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_get_device_device_not_found() {
+        let home = make_home();
+        assert!(matches!(
+            home.get_device("living_room", "no_such_device"),
+            Err(SmartHomeError::DeviceNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_report_contains_home_and_rooms() {
+        let home = make_home();
+        let r = home.report();
+        assert!(r.contains("Apartment"));
+        assert!(r.contains("living_room"));
+        assert!(r.contains("bedroom"));
     }
 }
