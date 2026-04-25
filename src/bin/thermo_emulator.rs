@@ -21,7 +21,7 @@
 //! ```
 //!
 //! Line 1 — UDP destination address (`host:port`).
-//! Line 2 — Send interval in milliseconds.
+//! Line 2 — Send interval in milliseconds (must be > 0).
 //!
 //! # Protocol
 //!
@@ -31,6 +31,8 @@
 
 use std::io;
 use std::net::UdpSocket;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -42,15 +44,23 @@ fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| "thermo_emulator.conf".to_string());
 
     let (dest_addr, interval_ms) = read_config(&config_path)?;
+
+    if interval_ms == 0 {
+        anyhow::bail!("interval must be > 0 ms");
+    }
+
     let interval = Duration::from_millis(interval_ms);
 
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_nonblocking(true)?;
 
-    log::info!("Thermometer emulator → {dest_addr} every {interval_ms} ms");
-    println!("Thermometer emulator → {dest_addr} every {interval_ms} ms  (Ctrl+C to stop)");
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || r.store(false, Ordering::Release))?;
 
-    loop {
+    log::info!("Thermometer emulator → {dest_addr} every {interval_ms} ms  (press Ctrl+C to stop)");
+
+    while running.load(Ordering::Acquire) {
         let temp = simulate_temperature();
         let payload = format!("{temp:.1}\n");
 
@@ -67,6 +77,9 @@ fn main() -> anyhow::Result<()> {
 
         thread::sleep(interval);
     }
+
+    log::info!("Thermometer emulator shutting down");
+    Ok(())
 }
 
 /// Returns a pseudo-random temperature in the range [15.0, 35.0] °C.

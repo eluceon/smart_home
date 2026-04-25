@@ -1,7 +1,7 @@
 //! Smart thermometer — local mock and UDP-receiving variants.
 
 use crate::error::NetworkError;
-use std::net::UdpSocket;
+use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread::{self, JoinHandle};
@@ -13,6 +13,7 @@ struct UdpReceiver {
     temperature: Arc<RwLock<Option<f32>>>,
     shutdown: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
+    bound_addr: SocketAddr,
 }
 
 impl UdpReceiver {
@@ -23,6 +24,7 @@ impl UdpReceiver {
         let socket = UdpSocket::bind(bind_addr)?;
         // Short timeout so the thread can check the shutdown flag periodically.
         socket.set_read_timeout(Some(Duration::from_millis(200)))?;
+        let bound_addr = socket.local_addr()?;
 
         let temp_ref = temperature.clone();
         let shut_ref = shutdown.clone();
@@ -30,7 +32,7 @@ impl UdpReceiver {
         let thread = thread::spawn(move || {
             let mut buf = [0u8; 64];
             loop {
-                if shut_ref.load(Ordering::SeqCst) {
+                if shut_ref.load(Ordering::Acquire) {
                     break;
                 }
                 match socket.recv_from(&mut buf) {
@@ -63,6 +65,7 @@ impl UdpReceiver {
             temperature,
             shutdown,
             thread: Some(thread),
+            bound_addr,
         })
     }
 
@@ -72,11 +75,15 @@ impl UdpReceiver {
             .map_err(|_| NetworkError::Protocol("RwLock poisoned".into()))?
             .ok_or(NetworkError::NoDataReceived)
     }
+
+    fn bound_addr(&self) -> SocketAddr {
+        self.bound_addr
+    }
 }
 
 impl Drop for UdpReceiver {
     fn drop(&mut self) {
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Release);
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
@@ -90,7 +97,7 @@ enum ThermometerBackend {
 }
 
 /// A smart thermometer that can operate locally (mock) or by receiving UDP
-/// packets from a running [`thermo_emulator`].
+/// packets from a running `thermo_emulator` binary.
 ///
 /// When created with [`Thermometer::new_udp`], a background thread is spawned
 /// that listens for incoming UDP datagrams and stores the latest temperature.
@@ -120,10 +127,11 @@ impl Thermometer {
     }
 
     /// Creates a UDP-receiving thermometer that binds to `bind_addr` and
-    /// accepts temperature datagrams from a [`thermo_emulator`].
+    /// accepts temperature datagrams from a `thermo_emulator` binary.
     ///
     /// A background thread is started immediately and runs until the
-    /// `Thermometer` is dropped.
+    /// `Thermometer` is dropped. Pass `"host:0"` to let the OS pick a free port,
+    /// then retrieve the actual address with [`Thermometer::bound_addr`].
     ///
     /// # Errors
     ///
@@ -140,12 +148,22 @@ impl Thermometer {
         &self.name
     }
 
+    /// Returns the local address the UDP socket is bound to, or `None` for
+    /// local (mock) thermometers.
+    pub fn bound_addr(&self) -> Option<SocketAddr> {
+        match &self.backend {
+            ThermometerBackend::Udp(r) => Some(r.bound_addr()),
+            ThermometerBackend::Local(_) => None,
+        }
+    }
+
     /// Returns the current temperature in °C.
     ///
     /// # Errors
     ///
     /// - [`NetworkError::NoDataReceived`] if the UDP thermometer has not yet
     ///   received any packet.
+    #[must_use = "check the temperature value or handle the error"]
     pub fn temperature(&self) -> Result<f32, NetworkError> {
         match &self.backend {
             ThermometerBackend::Local(t) => Ok(*t),
@@ -196,18 +214,12 @@ mod tests {
 
     #[test]
     fn test_udp_thermometer_receives_data() {
-        // Grab a free ephemeral port, release it, then bind the thermometer to it.
-        let free_port = {
-            let probe = UdpSocket::bind("127.0.0.1:0").unwrap();
-            probe.local_addr().unwrap().port()
-            // probe is dropped here, freeing the port
-        };
-        let bind_addr = format!("127.0.0.1:{free_port}");
-
-        let thermo = Thermometer::new_udp("Sensor", &bind_addr).unwrap();
+        // Bind to an ephemeral port; retrieve the actual address to avoid TOCTOU.
+        let thermo = Thermometer::new_udp("Sensor", "127.0.0.1:0").unwrap();
+        let bind_addr = thermo.bound_addr().unwrap();
 
         let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
-        sender.send_to(b"23.7", &bind_addr).unwrap();
+        sender.send_to(b"23.7", bind_addr).unwrap();
 
         thread::sleep(Duration::from_millis(400));
         let temp = thermo.temperature().unwrap();

@@ -25,7 +25,7 @@ enum SocketBackend {
 /// A smart socket that can operate locally (mock) or via a remote TCP server.
 ///
 /// Use [`Socket::new`] for in-process testing and [`Socket::new_tcp`] to
-/// communicate with a running [`socket_emulator`].
+/// communicate with a running `socket_emulator` binary.
 #[derive(Debug)]
 pub struct Socket {
     name: String,
@@ -56,7 +56,7 @@ impl Socket {
     }
 
     /// Creates a TCP-connected socket that delegates all operations to a remote
-    /// [`socket_emulator`] listening at `addr`.
+    /// `socket_emulator` binary listening at `addr`.
     ///
     /// No connection is established until one of the operation methods is called.
     pub fn new_tcp(name: impl Into<String>, addr: impl Into<String>) -> Self {
@@ -111,6 +111,7 @@ impl Socket {
     ///
     /// Returns [`NetworkError`] if the TCP connection fails or the response
     /// cannot be parsed.
+    #[must_use = "check whether the socket is on"]
     pub fn is_on(&self) -> Result<bool, NetworkError> {
         match &self.backend {
             SocketBackend::Local { is_on, .. } => Ok(*is_on),
@@ -135,6 +136,7 @@ impl Socket {
     ///
     /// Returns [`NetworkError`] if the TCP connection fails or the response
     /// cannot be parsed as a float.
+    #[must_use = "check the current power draw"]
     pub fn power(&self) -> Result<f32, NetworkError> {
         match &self.backend {
             SocketBackend::Local {

@@ -47,11 +47,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // temperature() will return Err(NoDataReceived) until a packet arrives.
     let kitchen_sensor = match Thermometer::new_udp("Kitchen sensor", THERMO_BIND) {
         Ok(t) => {
-            println!("Thermometer bound to {THERMO_BIND}, waiting for data…");
+            log::info!("Thermometer bound to {THERMO_BIND}, waiting for data");
             t
         }
         Err(e) => {
-            eprintln!("Cannot bind UDP thermometer: {e}");
+            log::warn!("Cannot bind UDP thermometer: {e}");
             // Fall back to a local mock so the home can still be built.
             Thermometer::new("Kitchen sensor (mock)", 0.0)
         }

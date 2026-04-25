@@ -23,8 +23,10 @@
 //! | `POWER`    | float (e.g. `60`)  |
 
 use smart_home::devices::socket::{CMD_POWER, CMD_STATUS, CMD_TURN_OFF, CMD_TURN_ON};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -42,8 +44,8 @@ fn main() -> anyhow::Result<()> {
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:55001".to_string());
 
-    let listener = TcpListener::bind(&addr)?;
-    // Non-blocking so the accept loop can check for shutdown without hanging.
+    let listener = build_listener(&addr)?;
+    // Non-blocking so the accept loop can check the shutdown flag without hanging.
     listener.set_nonblocking(true)?;
 
     let state = Arc::new(Mutex::new(SocketState {
@@ -51,10 +53,13 @@ fn main() -> anyhow::Result<()> {
         power_watts: 100.0,
     }));
 
-    log::info!("Socket emulator listening on {addr}");
-    println!("Socket emulator listening on {addr}  (press Ctrl+C to stop)");
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || r.store(false, Ordering::Release))?;
 
-    loop {
+    log::info!("Socket emulator listening on {addr}  (press Ctrl+C to stop)");
+
+    while running.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((stream, peer)) => {
                 log::info!("Client connected: {peer}");
@@ -76,7 +81,19 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    log::info!("Socket emulator shutting down");
     Ok(())
+}
+
+/// Creates a TCP listener with `SO_REUSEADDR` so the port is immediately
+/// reusable after the process exits (avoids `TIME_WAIT` bind failures).
+fn build_listener(addr: &str) -> anyhow::Result<TcpListener> {
+    let addr: SocketAddr = addr.parse()?;
+    let sock = Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?;
+    sock.set_reuse_address(true)?;
+    sock.bind(&addr.into())?;
+    sock.listen(128)?;
+    Ok(sock.into())
 }
 
 fn handle_client(
@@ -103,22 +120,20 @@ fn process_command(cmd: &str, state: &Arc<Mutex<SocketState>>) -> String {
         Err(_) => return "ERROR lock poisoned".to_string(),
     };
 
-    if cmd == CMD_TURN_ON {
-        guard.is_on = true;
-        "OK".to_string()
-    } else if cmd == CMD_TURN_OFF {
-        guard.is_on = false;
-        "OK".to_string()
-    } else if cmd == CMD_STATUS {
-        if guard.is_on {
-            "ON".to_string()
-        } else {
-            "OFF".to_string()
+    match cmd {
+        CMD_TURN_ON => {
+            guard.is_on = true;
+            "OK".to_string()
         }
-    } else if cmd == CMD_POWER {
-        let power = if guard.is_on { guard.power_watts } else { 0.0 };
-        power.to_string()
-    } else {
-        format!("ERROR unknown command '{cmd}'")
+        CMD_TURN_OFF => {
+            guard.is_on = false;
+            "OK".to_string()
+        }
+        CMD_STATUS => if guard.is_on { "ON" } else { "OFF" }.to_string(),
+        CMD_POWER => {
+            let power = if guard.is_on { guard.power_watts } else { 0.0 };
+            power.to_string()
+        }
+        _ => format!("ERROR unknown command '{cmd}'"),
     }
 }
