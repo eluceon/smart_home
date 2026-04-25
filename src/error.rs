@@ -1,23 +1,35 @@
 //! Error types for the smart home library.
 
-use std::fmt;
+use thiserror::Error;
+
+/// Errors that arise from network I/O or protocol violations.
+#[derive(Debug, Error)]
+pub enum NetworkError {
+    /// An underlying I/O error (connection refused, broken pipe, …).
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// The server returned an unexpected response.
+    #[error("Protocol error: {0}")]
+    Protocol(String),
+
+    /// No temperature data has been received yet (UDP stream not started).
+    #[error("No data received yet")]
+    NoDataReceived,
+}
 
 /// Errors that can occur when accessing rooms or devices in a smart home.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum SmartHomeError {
     /// The requested room was not found.
+    #[error("Room '{0}' not found")]
     RoomNotFound(String),
+
     /// The requested device was not found.
+    #[error("Device '{0}' not found")]
     DeviceNotFound(String),
-}
 
-impl fmt::Display for SmartHomeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SmartHomeError::RoomNotFound(name) => write!(f, "Room '{}' not found", name),
-            SmartHomeError::DeviceNotFound(name) => write!(f, "Device '{}' not found", name),
-        }
-    }
+    /// A network-level error occurred while communicating with a device.
+    #[error("Network error: {0}")]
+    Network(#[from] NetworkError),
 }
-
-impl std::error::Error for SmartHomeError {}

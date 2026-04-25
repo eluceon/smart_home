@@ -5,7 +5,7 @@ use crate::report::Report;
 use std::fmt;
 
 /// A smart device: either a [`Thermometer`] or a [`Socket`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum SmartDevice {
     /// Thermometer variant.
     Thermometer(Thermometer),
@@ -66,12 +66,21 @@ impl From<Thermometer> for SmartDevice {
 impl Report for SmartDevice {
     fn report(&self) -> String {
         match self {
-            SmartDevice::Thermometer(t) => {
-                format!("Thermometer '{}': {} °C", t.name(), t.temperature())
-            }
+            SmartDevice::Thermometer(t) => match t.temperature() {
+                Ok(temp) => format!("Thermometer '{}': {:.1} °C", t.name(), temp),
+                Err(e) => format!("Thermometer '{}': ERROR — {}", t.name(), e),
+            },
             SmartDevice::Socket(s) => {
-                let status = if s.is_on() { "on" } else { "off" };
-                format!("Socket '{}': {} (power: {} W)", s.name(), status, s.power())
+                let status = match s.is_on() {
+                    Ok(true) => "on".to_string(),
+                    Ok(false) => "off".to_string(),
+                    Err(e) => format!("ERROR — {e}"),
+                };
+                let power = match s.power() {
+                    Ok(w) => format!("{w} W"),
+                    Err(e) => format!("ERROR — {e}"),
+                };
+                format!("Socket '{}': {} (power: {})", s.name(), status, power)
             }
         }
     }
@@ -106,8 +115,8 @@ mod tests {
     fn test_as_socket_mut() {
         let socket = Socket::new("Lamp", 100.0);
         let mut device = SmartDevice::Socket(socket);
-        device.as_socket_mut().unwrap().turn_on();
-        assert!(device.as_socket().unwrap().is_on());
+        device.as_socket_mut().unwrap().turn_on().unwrap();
+        assert!(device.as_socket().unwrap().is_on().unwrap());
     }
 
     #[test]
@@ -141,7 +150,7 @@ mod tests {
     #[test]
     fn test_report_socket_on() {
         let mut device: SmartDevice = Socket::new("Lamp", 60.0).into();
-        device.as_socket_mut().unwrap().turn_on();
+        device.as_socket_mut().unwrap().turn_on().unwrap();
         let r = device.report();
         assert!(r.contains("on"));
         assert!(r.contains("60"));

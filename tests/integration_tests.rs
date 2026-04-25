@@ -44,13 +44,13 @@ fn smart_home_toggle_socket() {
         .as_socket_mut()
         .expect("expected a socket");
 
-    socket.turn_on();
-    assert!(socket.is_on());
-    assert_eq!(socket.power(), 2000.0);
+    socket.turn_on().unwrap();
+    assert!(socket.is_on().unwrap());
+    assert_eq!(socket.power().unwrap(), 2000.0);
 
-    socket.turn_off();
-    assert!(!socket.is_on());
-    assert_eq!(socket.power(), 0.0);
+    socket.turn_off().unwrap();
+    assert!(!socket.is_on().unwrap());
+    assert_eq!(socket.power().unwrap(), 0.0);
 
     let report = home.report();
     assert!(report.contains("Space heater"));

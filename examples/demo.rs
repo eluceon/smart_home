@@ -7,6 +7,7 @@
 //!  - Error handling when a room or device is not found.
 
 use smart_home::{room, Report, SmartDevice, SmartHome, Socket, Thermometer};
+use std::error::Error;
 
 /// Prints a labelled report for any type that implements [`Report`].
 fn print_report<R: Report>(label: &str, item: &R) {
@@ -15,7 +16,7 @@ fn print_report<R: Report>(label: &str, item: &R) {
     print!("{}", item.report());
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // ── Build initial home with the `room!` macro ─────────────────────────
 
     let living_room = room!(
@@ -65,7 +66,7 @@ fn main() {
             .get_device_mut("ceiling_light")
             .and_then(|d| d.as_socket_mut())
         {
-            socket.turn_on();
+            socket.turn_on()?;
             println!("Turned on 'ceiling_light' in bedroom.");
         }
     }
@@ -123,4 +124,6 @@ fn main() {
     // ── Final home report ─────────────────────────────────────────────────
 
     print_report("FINAL HOME STATE", &home);
+
+    Ok(())
 }

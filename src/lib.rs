@@ -3,6 +3,10 @@
 //! Provides building blocks for a smart home: devices (thermometers, sockets)
 //! organised into rooms and a house.  All types implement the [`Report`] trait
 //! so their state can be inspected at any level of the hierarchy.
+//!
+//! Devices can operate locally (in-process mock) or via the network:
+//! - [`Socket::new_tcp`] connects to a running `socket_emulator` over TCP.
+//! - [`Thermometer::new_udp`] listens for UDP datagrams from a `thermo_emulator`.
 
 pub mod devices;
 pub mod error;
@@ -12,7 +16,7 @@ pub mod smart_device;
 pub mod smart_home;
 
 pub use devices::{Socket, Thermometer};
-pub use error::SmartHomeError;
+pub use error::{NetworkError, SmartHomeError};
 pub use report::Report;
 pub use room::Room;
 pub use smart_device::SmartDevice;

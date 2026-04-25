@@ -1,6 +1,28 @@
 [package]
 name = "smart_home"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "Smart home library with thermometers and sockets supporting TCP/UDP"
+license = "MIT"
 
 [dependencies]
+thiserror = "1"
+log = "0.4"
+env_logger = "0.11"
+anyhow = "1"
+
+[[bin]]
+name = "socket_emulator"
+path = "src/bin/socket_emulator.rs"
+
+[[bin]]
+name = "thermo_emulator"
+path = "src/bin/thermo_emulator.rs"
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+
+[[example]]
+name = "demo_network"
+path = "examples/demo_network.rs"

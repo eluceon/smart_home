@@ -5,7 +5,7 @@ use crate::smart_device::SmartDevice;
 use std::collections::HashMap;
 
 /// A room that holds a named collection of smart devices.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Room {
     name: String,
     devices: HashMap<String, SmartDevice>,
@@ -111,14 +111,16 @@ mod tests {
         room.get_device_mut("lamp")
             .and_then(|d| d.as_socket_mut())
             .unwrap()
-            .turn_on();
+            .turn_on()
+            .unwrap();
 
         assert!(room
             .get_device("lamp")
             .unwrap()
             .as_socket()
             .unwrap()
-            .is_on());
+            .is_on()
+            .unwrap());
     }
 
     #[test]
