@@ -28,3 +28,7 @@ path = "examples/demo.rs"
 [[example]]
 name = "demo_network"
 path = "examples/demo_network.rs"
+
+[[example]]
+name = "demo_patterns"
+path = "examples/demo_patterns.rs"

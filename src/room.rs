@@ -1,14 +1,41 @@
-//! Smart home room.
+//! Smart home room with observer-pattern subscribers.
 
 use crate::report::Report;
 use crate::smart_device::SmartDevice;
 use std::collections::HashMap;
 
-/// A room that holds a named collection of smart devices.
-#[derive(Debug)]
+/// Observer that is notified whenever a device is added to a room.
+///
+/// Implementors receive a reference to the newly added device. Closures
+/// `FnMut(&SmartDevice)` automatically implement this trait.
+pub trait Subscriber {
+    /// Called after a device has been added to the room.
+    fn on_event(&mut self, device: &SmartDevice);
+}
+
+/// Blanket implementation so closures can be used as subscribers.
+impl<F: FnMut(&SmartDevice)> Subscriber for F {
+    fn on_event(&mut self, device: &SmartDevice) {
+        self(device);
+    }
+}
+
+/// A room that holds a named collection of smart devices and notifies
+/// registered [`Subscriber`]s when a device is added.
 pub struct Room {
     name: String,
     devices: HashMap<String, SmartDevice>,
+    subscribers: Vec<Box<dyn Subscriber>>,
+}
+
+impl std::fmt::Debug for Room {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Room")
+            .field("name", &self.name)
+            .field("devices", &self.devices)
+            .field("subscribers", &self.subscribers.len())
+            .finish()
+    }
 }
 
 impl Room {
@@ -17,6 +44,7 @@ impl Room {
         Self {
             name: name.into(),
             devices: HashMap::new(),
+            subscribers: Vec::new(),
         }
     }
 
@@ -34,8 +62,24 @@ impl Room {
     ///
     /// Accepts any type that converts into [`SmartDevice`] (e.g. [`Socket`][crate::Socket]
     /// or [`Thermometer`][crate::Thermometer]).
+    ///
+    /// All registered [`Subscriber`]s are notified only when a **new** key is
+    /// inserted. If the key already exists, the device is replaced silently.
     pub fn add_device(&mut self, name: impl Into<String>, device: impl Into<SmartDevice>) {
-        self.devices.insert(name.into(), device.into());
+        use std::collections::hash_map::Entry;
+        let key: String = name.into();
+        let device: SmartDevice = device.into();
+        match self.devices.entry(key) {
+            Entry::Occupied(mut e) => {
+                e.insert(device);
+            }
+            Entry::Vacant(e) => {
+                let d = e.insert(device);
+                for sub in &mut self.subscribers {
+                    sub.on_event(d);
+                }
+            }
+        }
     }
 
     /// Removes and returns the device with the given key, or `None` if absent.
@@ -51,6 +95,22 @@ impl Room {
     /// Returns a mutable reference to the device with the given key, or `None`.
     pub fn get_device_mut(&mut self, name: &str) -> Option<&mut SmartDevice> {
         self.devices.get_mut(name)
+    }
+
+    /// Registers a subscriber that will be notified on every [`Room::add_device`].
+    ///
+    /// Accepts both structs implementing [`Subscriber`] and closures
+    /// `FnMut(&SmartDevice)`.
+    pub fn subscribe(&mut self, subscriber: impl Subscriber + 'static) {
+        self.subscribers.push(Box::new(subscriber));
+    }
+}
+
+// ── Default ────────────────────────────────────────────────────────────────────
+
+impl Default for Room {
+    fn default() -> Self {
+        Self::new("Unnamed room")
     }
 }
 
@@ -142,5 +202,60 @@ mod tests {
         assert!(r.contains("Hall"));
         assert!(r.contains("sensor"));
         assert!(r.contains("22.5"));
+    }
+
+    // ── Observer tests ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_subscriber_notified_on_add() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let mut room = Room::new("Test");
+        let count = Rc::new(RefCell::new(0usize));
+        let count_clone = count.clone();
+
+        room.subscribe(move |_device: &SmartDevice| {
+            *count_clone.borrow_mut() += 1;
+        });
+
+        room.add_device("lamp", Socket::default());
+        room.add_device("sensor", Thermometer::default());
+
+        assert_eq!(*count.borrow(), 2);
+        assert_eq!(room.device_count(), 2);
+    }
+
+    #[test]
+    fn test_closure_subscriber() {
+        use std::cell::RefCell;
+
+        let events: std::rc::Rc<RefCell<Vec<String>>> = std::rc::Rc::new(RefCell::new(Vec::new()));
+        let events_clone = events.clone();
+
+        let mut room = Room::new("Test");
+        room.subscribe(move |device: &SmartDevice| {
+            events_clone
+                .borrow_mut()
+                .push(format!("{}", device.report()));
+        });
+
+        room.add_device("lamp", Socket::new("Desk lamp", 60.0));
+        room.add_device("sensor", Thermometer::new("Sensor", 22.5));
+
+        let logged = events.borrow();
+        assert_eq!(logged.len(), 2);
+        assert!(logged[0].contains("Desk lamp"));
+        assert!(logged[1].contains("Sensor"));
+    }
+
+    #[test]
+    fn test_subscriber_default_room() {
+        let mut room = Room::default();
+        room.subscribe(|_device: &SmartDevice| {
+            // no-op
+        });
+        room.add_device("test", Socket::default());
+        assert_eq!(room.device_count(), 1);
     }
 }

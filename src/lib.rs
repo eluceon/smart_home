@@ -7,18 +7,30 @@
 //! Devices can operate locally (in-process mock) or via the network:
 //! - [`Socket::new_tcp`] connects to a running `socket_emulator` over TCP.
 //! - [`Thermometer::new_udp`] listens for UDP datagrams from a `thermo_emulator`.
+//!
+//! # Patterns (Assignment 4)
+//!
+//! - [`HomeBuilder`] — typestate builder that prevents adding devices before
+//!   the first room is created.
+//! - [`Reporter`] — statically-typed heterogeneous list for composing reports.
+//! - [`Subscriber`] — observer pattern: register callbacks that fire when a
+//!   device is added to a [`Room`].
 
+pub mod builder;
 pub mod devices;
 pub mod error;
 pub mod report;
+pub mod reporter;
 pub mod room;
 pub mod smart_device;
 pub mod smart_home;
 
+pub use builder::HomeBuilder;
 pub use devices::{Socket, Thermometer};
 pub use error::{NetworkError, SmartHomeError};
 pub use report::Report;
-pub use room::Room;
+pub use reporter::Reporter;
+pub use room::{Room, Subscriber};
 pub use smart_device::SmartDevice;
 pub use smart_home::SmartHome;
 

@@ -1,7 +1,7 @@
 //! Smart socket — local mock and TCP-connected variants.
 
 use crate::error::NetworkError;
-use std::io::{BufRead, BufReader, Write as IoWrite};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
@@ -185,6 +185,31 @@ fn query(addr: &str, cmd: &str) -> Result<String, NetworkError> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
     Ok(line.trim().to_string())
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
+impl crate::report::Report for Socket {
+    fn report(&self) -> String {
+        let status = match self.is_on() {
+            Ok(true) => "on",
+            Ok(false) => "off",
+            Err(e) => return format!("Socket '{}': ERROR — {e}", self.name()),
+        };
+        let power = match self.power() {
+            Ok(w) => format!("{w} W"),
+            Err(e) => format!("ERROR — {e}"),
+        };
+        format!("Socket '{}': {} (power: {})", self.name(), status, power)
+    }
+}
+
+// ── Default ────────────────────────────────────────────────────────────────────
+
+impl Default for Socket {
+    fn default() -> Self {
+        Self::new("Unnamed socket", 0.0)
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

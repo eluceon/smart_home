@@ -182,6 +182,25 @@ impl Thermometer {
     }
 }
 
+// ── Report ────────────────────────────────────────────────────────────────────
+
+impl crate::report::Report for Thermometer {
+    fn report(&self) -> String {
+        match self.temperature() {
+            Ok(temp) => format!("Thermometer '{}': {:.1} °C", self.name(), temp),
+            Err(e) => format!("Thermometer '{}': ERROR — {}", self.name(), e),
+        }
+    }
+}
+
+// ── Default ────────────────────────────────────────────────────────────────────
+
+impl Default for Thermometer {
+    fn default() -> Self {
+        Self::new("Unnamed thermometer", 0.0)
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

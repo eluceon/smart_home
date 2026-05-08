@@ -47,6 +47,14 @@ impl SmartDevice {
     }
 }
 
+// ── Default ────────────────────────────────────────────────────────────────────
+
+impl Default for SmartDevice {
+    fn default() -> Self {
+        SmartDevice::Thermometer(Thermometer::default())
+    }
+}
+
 // ── From conversions ──────────────────────────────────────────────────────────
 
 impl From<Socket> for SmartDevice {
