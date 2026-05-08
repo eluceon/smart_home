@@ -1,83 +1,177 @@
-# Smart Home (Rust library)
+# Smart Home
 
-A compact Rust library that models a smart home with devices (thermometers and
-sockets), rooms, and a house structure. The package also includes a runnable
-example and tests.
+A Rust library modelling a smart home: thermometers, sockets, rooms, and a
+house. Supports local (in-process) and network (TCP/UDP) device backends.
 
 ## Features
 
-- Modular structure: devices, rooms, home
-- Type-safe device model via `enum`
-- Public API docs with examples
-- Unit and integration tests
-- Clippy- and rustfmt-friendly code
+- **Devices**: thermometer (local / UDP), socket (local / TCP)
+- **Hierarchy**: `SmartDevice` → `Room` → `SmartHome`, all implement the
+  `Report` trait
+- **Error handling**: typed errors via `thiserror` — no panics in library code
+- **Network emulators**: `socket_emulator` (TCP) and `thermo_emulator` (UDP)
+  binaries
+- **Design patterns**: typestate builder, static polymorphism reporter, observer
+- **Tests**: 36 unit + 14 integration + 5 doctests; clippy- and fmt-clean
 
-## Usage
-
-### Build
+## Quick start
 
 ```bash
 cargo build
-```
-
-### Run the example
-
-```bash
+cargo test
 cargo run --example demo
 ```
 
-## Library API
+## Examples
+
+| Example | Description |
+|---------|-------------|
+| `cargo run --example demo` | Full API: room macro, dynamic management, error handling |
+| `cargo run --example demo_network` | TCP sockets + UDP thermometers with emulators |
+| `cargo run --example demo_patterns` | Builder, Reporter, Observer patterns |
+
+### Network example (three terminals)
+
+```bash
+# Terminal 1 — TCP socket emulator
+cargo run --bin socket_emulator -- 127.0.0.1:55001
+
+# Terminal 2 — UDP thermometer emulator
+cargo run --bin thermo_emulator
+
+# Terminal 3 — smart home example
+cargo run --example demo_network
+```
+
+## API overview
 
 ### Thermometer
 
 ```rust
-let mut therm = Thermometer::new("Living room".to_string(), 22.5);
-let temp = therm.temperature();      // 22.5
-therm.set_temperature(25.0);         // Update temperature
+use smart_home::Thermometer;
+
+// Local (mock)
+let thermo = Thermometer::new("Kitchen", 22.5);
+assert_eq!(thermo.temperature().unwrap(), 22.5);
+
+// UDP — receives datagrams from thermo_emulator
+let thermo = Thermometer::new_udp("Kitchen", "127.0.0.1:8890")?;
+// temperature() returns Err(NoDataReceived) until the first packet
 ```
 
 ### Socket
 
 ```rust
-let mut socket = Socket::new("Lamp".to_string(), 100.0);
-socket.turn_on();
-socket.turn_off();
-let power = socket.power();
-let status = socket.is_on();
+use smart_home::Socket;
+
+// Local (mock)
+let mut socket = Socket::new("Lamp", 60.0);
+socket.turn_on()?;
+assert!(socket.is_on()?);
+assert_eq!(socket.power()?, 60.0);
+
+// TCP — connects to socket_emulator
+let socket = Socket::new_tcp("Lamp", "127.0.0.1:55001");
 ```
 
-### SmartDevice
+### SmartDevice, Room, SmartHome
 
 ```rust
-let device = SmartDevice::Thermometer(therm);
-// or
-let device = SmartDevice::Socket(socket);
+use smart_home::{room, Room, SmartDevice, SmartHome};
 
-println!("{}", device);
+// room! macro
+let r = room!("Living room",
+    "lamp"   => Socket::new("Lamp", 60.0),
+    "sensor" => Thermometer::new("Sensor", 22.5),
+);
+
+// SmartDevice wraps any device
+let device: SmartDevice = Socket::new("Lamp", 60.0).into();
+
+// Home with dynamic management
+let mut home = SmartHome::new("Apartment");
+home.add_room("living", r);
+home.add_room("bedroom", Room::new("Bedroom"));
+
+// Error-typed device lookup
+match home.get_device("living", "lamp") {
+    Ok(d) => println!("{}", d.report()),
+    Err(SmartHomeError::RoomNotFound(name)) => eprintln!("No room: {name}"),
+    Err(SmartHomeError::DeviceNotFound(name)) => eprintln!("No device: {name}"),
+    Err(e) => eprintln!("{e}"),
+}
 ```
 
-### Room
+### Report trait
+
+Every level of the hierarchy implements `Report`:
 
 ```rust
-let devices = vec![...];
-let mut room = Room::new("Bedroom".to_string(), devices);
+use smart_home::Report;
 
-let device = room.get_device(0);
-let device = room.get_device_mut(0);
-room.print_report();
+fn print_report(item: &impl Report) {
+    println!("{}", item.report());
+}
+
+print_report(&device);
+print_report(&room);
+print_report(&home);
 ```
 
-### SmartHome
+## Patterns (Assignment 4)
+
+### HomeBuilder — typestate pattern
 
 ```rust
-let rooms = vec![...];
-let mut house = SmartHome::new("My home".to_string(), rooms);
+use smart_home::{HomeBuilder, Socket, Thermometer};
 
-let room = house.get_room(0);
-let room = house.get_room_mut(0);
-house.print_full_report();
+let home = HomeBuilder::new()
+    .add_room("Living room")
+    .add_device("lamp", Socket::default())
+    .add_device("sensor", Thermometer::default())
+    .add_room("Bedroom")
+    .add_device("heater", Socket::default())
+    .build();
+
+// Compile-time safety:
+// HomeBuilder::new().add_device(...) — does NOT compile
 ```
 
-## Notes
+### Reporter — static polymorphism
 
-This project is created for educational purposes.
+```rust
+use smart_home::Reporter;
+
+let report = Reporter::new()
+    .add(&room)
+    .add(&socket)
+    .add(&thermo)
+    .report();
+```
+
+### Observer — dynamic polymorphism
+
+```rust
+use smart_home::Subscriber;
+
+// Struct subscriber
+room.subscribe(MySubscriber);
+
+// Closure subscriber
+room.subscribe(|device: &SmartDevice| {
+    println!("Added: {}", device.report());
+});
+```
+
+## CI checks
+
+```bash
+cargo fmt --check
+cargo clippy -- -D warnings
+cargo test --locked
+cargo doc --no-deps
+```
+
+## License
+
+MIT
