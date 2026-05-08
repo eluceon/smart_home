@@ -12,7 +12,7 @@ house. Supports local (in-process) and network (TCP/UDP) device backends.
 - **Network emulators**: `socket_emulator` (TCP) and `thermo_emulator` (UDP)
   binaries
 - **Design patterns**: typestate builder, static polymorphism reporter, observer
-- **Tests**: 36 unit + 14 integration + 5 doctests; clippy- and fmt-clean
+- **CI**: tests, clippy, fmt, doc via GitHub Actions
 
 ## Quick start
 
@@ -163,14 +163,12 @@ room.subscribe(|device: &SmartDevice| {
 });
 ```
 
-## CI checks
+## CI
 
-```bash
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo test --locked
-cargo doc --no-deps
-```
+[![CI](https://github.com/eluceon/smart_home/actions/workflows/ci.yml/badge.svg)](https://github.com/eluceon/smart_home/actions/workflows/ci.yml)
+
+On every push and PR: `cargo fmt --check`, `cargo clippy -- -D warnings`,
+`cargo test --locked`, `cargo doc --no-deps`.
 
 ## License
 
