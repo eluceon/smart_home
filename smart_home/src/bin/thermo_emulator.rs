@@ -70,8 +70,7 @@ fn main() -> anyhow::Result<()> {
                 log::warn!("send would block, skipping");
             }
             Err(e) => {
-                log::error!("send error: {e}");
-                return Err(e.into());
+                log::error!("send error: {e}; continuing");
             }
         }
 

@@ -173,8 +173,14 @@ fn send_cmd(addr: &str, cmd: &str) -> Result<(), NetworkError> {
 }
 
 /// Opens a TCP connection, sends `cmd`, and returns the trimmed response line.
+///
+/// Uses a connect timeout of [`TCP_TIMEOUT`] (currently 5 s) so the caller
+/// is not blocked indefinitely when the emulator is unreachable.
 fn query(addr: &str, cmd: &str) -> Result<String, NetworkError> {
-    let stream = TcpStream::connect(addr)?;
+    let socket_addr: std::net::SocketAddr = addr
+        .parse()
+        .map_err(|e| NetworkError::Protocol(format!("invalid socket address '{addr}': {e}")))?;
+    let stream = TcpStream::connect_timeout(&socket_addr, TCP_TIMEOUT)?;
     stream.set_read_timeout(Some(TCP_TIMEOUT))?;
     stream.set_write_timeout(Some(TCP_TIMEOUT))?;
 

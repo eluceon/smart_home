@@ -15,6 +15,7 @@
 //! - [`Reporter`] — statically-typed heterogeneous list for composing reports.
 //! - [`Subscriber`] — observer pattern: register callbacks that fire when a
 //!   device is added to a [`Room`].
+#![warn(missing_docs)]
 
 pub mod builder;
 pub mod devices;
@@ -26,6 +27,7 @@ pub mod smart_device;
 pub mod smart_home;
 
 pub use builder::HomeBuilder;
+pub use devices::socket::{CMD_POWER, CMD_STATUS, CMD_TURN_OFF, CMD_TURN_ON};
 pub use devices::{Socket, Thermometer};
 pub use error::{NetworkError, SmartHomeError};
 pub use report::Report;

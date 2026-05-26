@@ -63,9 +63,9 @@ fn main() -> anyhow::Result<()> {
         match listener.accept() {
             Ok((stream, peer)) => {
                 log::info!("Client connected: {peer}");
-                let state_ref = state.clone();
+                let state_clone = state.clone();
                 thread::spawn(move || {
-                    if let Err(e) = handle_client(stream, state_ref) {
+                    if let Err(e) = handle_client(stream, state_clone) {
                         log::warn!("Client handler error: {e}");
                     }
                 });
@@ -114,7 +114,7 @@ fn handle_client(
     Ok(())
 }
 
-fn process_command(cmd: &str, state: &Arc<Mutex<SocketState>>) -> String {
+fn process_command(cmd: &str, state: &Mutex<SocketState>) -> String {
     let mut guard = match state.lock() {
         Ok(g) => g,
         Err(_) => return "ERROR lock poisoned".to_string(),

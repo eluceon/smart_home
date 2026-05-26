@@ -5,6 +5,7 @@ use crate::report::Report;
 use crate::room::Room;
 use crate::smart_device::SmartDevice;
 use std::collections::HashMap;
+use std::fmt::Write;
 
 /// A smart home that holds a named collection of rooms.
 #[derive(Debug)]
@@ -87,10 +88,10 @@ impl Report for SmartHome {
         let mut keys: Vec<&String> = self.rooms.keys().collect();
         keys.sort();
         for key in keys {
-            s.push_str(&format!("\n[Room: {}]\n", key));
+            let _ = write!(s, "\n[Room: {key}]\n");
             s.push_str(&self.rooms[key].report());
         }
-        s.push_str(&format!("\n{}\n", sep));
+        let _ = write!(s, "\n{sep}\n");
         s
     }
 }

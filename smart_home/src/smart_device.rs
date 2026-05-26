@@ -74,22 +74,8 @@ impl From<Thermometer> for SmartDevice {
 impl Report for SmartDevice {
     fn report(&self) -> String {
         match self {
-            SmartDevice::Thermometer(t) => match t.temperature() {
-                Ok(temp) => format!("Thermometer '{}': {:.1} °C", t.name(), temp),
-                Err(e) => format!("Thermometer '{}': ERROR — {}", t.name(), e),
-            },
-            SmartDevice::Socket(s) => {
-                let status = match s.is_on() {
-                    Ok(true) => "on".to_string(),
-                    Ok(false) => "off".to_string(),
-                    Err(e) => format!("ERROR — {e}"),
-                };
-                let power = match s.power() {
-                    Ok(w) => format!("{w} W"),
-                    Err(e) => format!("ERROR — {e}"),
-                };
-                format!("Socket '{}': {} (power: {})", s.name(), status, power)
-            }
+            SmartDevice::Thermometer(t) => t.report(),
+            SmartDevice::Socket(s) => s.report(),
         }
     }
 }

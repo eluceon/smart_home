@@ -1,0 +1,9 @@
+[package]
+name = "app-dynamic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Demo application that dynamically loads the C ABI socket library at runtime"
+
+[dependencies]
+libloading = "0.8"

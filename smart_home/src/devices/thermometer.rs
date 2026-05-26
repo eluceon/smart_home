@@ -72,7 +72,7 @@ impl UdpReceiver {
     fn temperature(&self) -> Result<f32, NetworkError> {
         self.temperature
             .read()
-            .map_err(|_| NetworkError::Protocol("RwLock poisoned".into()))?
+            .map_err(|_| NetworkError::SyncPoison("RwLock poisoned".into()))?
             .ok_or(NetworkError::NoDataReceived)
     }
 
@@ -85,7 +85,9 @@ impl Drop for UdpReceiver {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::Release);
         if let Some(t) = self.thread.take() {
-            let _ = t.join();
+            if t.join().is_err() {
+                log::error!("UDP receiver thread panicked");
+            }
         }
     }
 }
@@ -174,10 +176,15 @@ impl Thermometer {
     /// Updates the temperature of a local thermometer.
     ///
     /// Has no effect on UDP thermometers (their temperature is set by incoming
-    /// UDP packets).
+    /// UDP packets). A warning is logged if called on a UDP thermometer.
     pub fn set_temperature(&mut self, temperature: f32) {
         if let ThermometerBackend::Local(t) = &mut self.backend {
             *t = temperature;
+        } else {
+            log::warn!(
+                "set_temperature({temperature:.1}) called on UDP thermometer '{}' — ignored",
+                self.name
+            );
         }
     }
 }
@@ -233,6 +240,8 @@ mod tests {
 
     #[test]
     fn test_udp_thermometer_receives_data() {
+        use std::time::Instant;
+
         // Bind to an ephemeral port; retrieve the actual address to avoid TOCTOU.
         let thermo = Thermometer::new_udp("Sensor", "127.0.0.1:0").unwrap();
         let bind_addr = thermo.bound_addr().unwrap();
@@ -240,8 +249,22 @@ mod tests {
         let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
         sender.send_to(b"23.7", bind_addr).unwrap();
 
-        thread::sleep(Duration::from_millis(400));
-        let temp = thermo.temperature().unwrap();
-        assert!((temp - 23.7).abs() < 0.01);
+        // Poll until the background thread processes the datagram, or time out.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut last_error = None;
+        while Instant::now() < deadline {
+            match thermo.temperature() {
+                Ok(temp) => {
+                    assert!((temp - 23.7).abs() < 0.01);
+                    return;
+                }
+                Err(e) => last_error = Some(e),
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        panic!(
+            "thermometer did not receive data within deadline; last error: {:?}",
+            last_error
+        );
     }
 }

@@ -1,34 +1,13 @@
-[package]
-name = "smart_home"
+[workspace]
+resolver = "2"
+members = [
+    "smart_home",
+    "socket-c",
+    "app-static",
+    "app-dynamic",
+]
+
+[workspace.package]
 version = "0.2.0"
 edition = "2021"
-description = "Smart home library with thermometers and sockets supporting TCP/UDP"
 license = "MIT"
-
-[dependencies]
-thiserror = "1"
-log = "0.4"
-env_logger = "0.11"
-anyhow = "1"
-socket2 = "0.5"
-ctrlc = "3"
-
-[[bin]]
-name = "socket_emulator"
-path = "src/bin/socket_emulator.rs"
-
-[[bin]]
-name = "thermo_emulator"
-path = "src/bin/thermo_emulator.rs"
-
-[[example]]
-name = "demo"
-path = "examples/demo.rs"
-
-[[example]]
-name = "demo_network"
-path = "examples/demo_network.rs"
-
-[[example]]
-name = "demo_patterns"
-path = "examples/demo_patterns.rs"

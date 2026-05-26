@@ -64,20 +64,27 @@ impl Room {
     /// or [`Thermometer`][crate::Thermometer]).
     ///
     /// All registered [`Subscriber`]s are notified only when a **new** key is
-    /// inserted. If the key already exists, the device is replaced silently.
-    pub fn add_device(&mut self, name: impl Into<String>, device: impl Into<SmartDevice>) {
+    /// inserted. If the key already exists, the device is replaced and the
+    /// previous [`SmartDevice`] is returned.
+    ///
+    /// Returns `Some(old_device)` if the key was already present, `None`
+    /// otherwise.
+    pub fn add_device(
+        &mut self,
+        name: impl Into<String>,
+        device: impl Into<SmartDevice>,
+    ) -> Option<SmartDevice> {
         use std::collections::hash_map::Entry;
         let key: String = name.into();
         let device: SmartDevice = device.into();
         match self.devices.entry(key) {
-            Entry::Occupied(mut e) => {
-                e.insert(device);
-            }
+            Entry::Occupied(mut e) => Some(e.insert(device)),
             Entry::Vacant(e) => {
                 let d = e.insert(device);
                 for sub in &mut self.subscribers {
                     sub.on_event(d);
                 }
+                None
             }
         }
     }
@@ -235,9 +242,7 @@ mod tests {
 
         let mut room = Room::new("Test");
         room.subscribe(move |device: &SmartDevice| {
-            events_clone
-                .borrow_mut()
-                .push(format!("{}", device.report()));
+            events_clone.borrow_mut().push(device.report().to_string());
         });
 
         room.add_device("lamp", Socket::new("Desk lamp", 60.0));

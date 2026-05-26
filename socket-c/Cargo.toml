@@ -1,0 +1,11 @@
+[package]
+name = "socket-c"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Smart socket with C ABI — static (.a) and dynamic (.so) library"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]

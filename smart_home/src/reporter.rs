@@ -54,6 +54,14 @@ impl<T> Reporter<T> {
     }
 }
 
+// `ReportAll` is `pub(crate)`, so this impl block is only usable when `T`
+// satisfies the bound — which callers from outside the crate cannot name.
+// The `#[allow]` attributes are intentional:
+//   - `private_bounds`   — `ReportAll` is a pub(crate) trait exposed in a
+//     public impl (the bound is deliberately hidden from the public API).
+//   - `unknown_lints`    — guard for future / older compilers where
+//     `private_bounds` may not yet be recognised (forward-compat).
+#[allow(unknown_lints)]
 #[allow(private_bounds)]
 impl<T: ReportAll> Reporter<T> {
     /// Produces a combined report string from all added items.
